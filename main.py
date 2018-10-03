@@ -62,7 +62,7 @@ def preprocess(text):
             '''
 
 def compute_tf_idf(docs):
-
+    term_occurence_matrix_ret = np.zeros((docs_num, vocab_size))
     occurence_matrix = np.zeros((docs_num, vocab_size))
     occurence_num_matrix = np.zeros((docs_num, vocab_size))
     for text in docs:   # Iterate through all cocuments
@@ -82,6 +82,7 @@ def compute_tf_idf(docs):
             term_freq = (c[word])
             occurence_num_matrix[row, vocabulary.index(word)] += term_freq
 
+    term_occurence_matrix_ret = occurence_num_matrix
     term_occurence_matrix = np.sum(occurence_matrix, axis = 0)
     term_occurence_num_matrix = np.sum(occurence_num_matrix, axis = 0)
 
@@ -95,10 +96,33 @@ def compute_tf_idf(docs):
     tf_value = term_occurence_num_matrix/vocab_size
 
     tf_idf_weight = idf_value*tf_value
-    return tf_idf_weight
+    tf_idf_weight = np.mean(tf_idf_weight, axis=0)
 
-def comput_tdv(docs):
+    print(tf_idf_weight)
+    return tf_idf_weight, term_occurence_matrix_ret
 
+def compute_log_entropy(docs, vocabulary_list, occur_matrix):
+    frequency_matrix = np.zeros((docs_num, vocab_size))
+    cVocabulary = Counter(vocabulary_list)
+    for text in docs:   # Iterate through all cocuments
+        cText = Counter(text)
+        preprocessed_text = list(preprocess(text))
+        row = docs.index(text)
+
+        for word in preprocessed_text:
+            col = vocabulary.index(word)
+            frequency_matrix[row, col] += cText[word]/cVocabulary[word]
+
+    local_w = occur_matrix + 1;
+    local_weight_t = np.log(local_w)
+    local_weight = np.mean(local_weight_t, axis=0)
+    frequency_matrix_log = np.log(frequency_matrix + 1) # Add 1 to avoid inf numbers
+    mul = np.multiply(frequency_matrix_log,frequency_matrix);
+    mul_sum = np.sum(mul, axis=0)
+    global_weight = 1 +  mul_sum/(np.log(docs_num+1))
+    final_weight = np.multiply(local_weight,global_weight);
+    log_entropy_weight = final_weight
+    return log_entropy_weight
 
 
 def get_files_from_dir(directory):
@@ -132,18 +156,27 @@ def main():
     '''
     # We use set to ensure unique of a term in vocab
     vocab = set()
+    vocab_l = list()
 
     for text in docs:
         tokens = preprocess(text)
+        tokens_l = preprocess(text)
         vocab.update(tokens)
+        vocab_l.append(list(tokens_l))
 
     vocabulary = sorted(vocab, reverse = False)
-    #print(np.shape(vocabulary))
-    #print(vocabulary)
     vocab_size = len(vocabulary)
-    #print(vocab_size)
 
-    compute_tf_idf(docs)
+    occur_matrix = np.zeros((docs_num, vocab_size))
+    if_idf_weight, occur_matrix = compute_tf_idf(docs)
+
+    vocabulary_list = [item for sublist in vocab_l for item in sublist]
+    log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
+
+    # Just debugging
+    #c = Counter(flat_list)
+    #print(len(c))
+
 
 if __name__ == '__main__':
     main()

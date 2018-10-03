@@ -2,7 +2,9 @@ import glob
 import os
 import nltk
 import numpy as np
+import pandas as pd
 
+from csv import DictWriter
 from nltk.stem.porter import PorterStemmer
 from nltk.stem import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
@@ -95,11 +97,10 @@ def compute_tf_idf(docs):
     idf_value = np.log(docs_num/term_occurence_matrix)
     tf_value = term_occurence_num_matrix/vocab_size
 
-    tf_idf_weight = idf_value*tf_value
-    tf_idf_weight = np.mean(tf_idf_weight, axis=0)
+    tf_idf_weight = np.multiply(idf_value,tf_value)
 
     print(tf_idf_weight)
-    return tf_idf_weight, term_occurence_matrix_ret
+    return idf_value, term_occurence_matrix_ret
 
 def compute_log_entropy(docs, vocabulary_list, occur_matrix):
     frequency_matrix = np.zeros((docs_num, vocab_size))
@@ -124,6 +125,7 @@ def compute_log_entropy(docs, vocabulary_list, occur_matrix):
     log_entropy_weight = final_weight
     return log_entropy_weight
 
+def compute_tdv(docs):
 
 def get_files_from_dir(directory):
     global docs
@@ -140,6 +142,38 @@ def get_files_from_dir(directory):
     print(files[1])
     print(len(files))
     '''
+
+WEIGHT_CSV = 'self_weight.csv'
+WEIGHT_CSV_SORT = 'self_weight_sort.csv'
+EXPECTED_TERM_NUM = 50
+
+def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, filename):
+    entropy_arr = np.squeeze(np.asarray(entropy_weights))
+    idf_term_list = pd.Series(idf_weights)
+    idf_w_des = idf_term_list.sort_values(ascending=False)
+    idf_w_des_idx = idf_w_des.index
+
+    tdv_term_list = pd.Series(tdv_weights)
+    tdv_w_des = tdv_term_list.sort_values(ascending=False)
+    tdv_w_des_idx = tdv_w_des.index
+
+    entropy_term_list = pd.Series(entropy_arr)
+    entropy_w_asc = entropy_term_list.sort_values(ascending=True)
+    entropy_w_asc_idx = entropy_w_asc.index
+    with open(filename, 'w', newline='') as csvfile:
+        fieldnames = ['idf_term_sort', 'idf_weight_sort','tdv_term_sort', 'tdv_weight_sort','entropy_term_sort', 'entropy_weight_sort']
+        writer = DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for i in range(vocab_size):
+            writer.writerow({
+                'idf_term_sort':vocabulary[idf_w_des_idx[i]],
+                'idf_weight_sort': idf_w_des.values[i],
+                'tdv_term_sort':vocabulary[tdv_w_des_idx[i]],
+                'tdv_weight_sort': tdv_w_des.values[i],
+                'entropy_term_sort':vocabulary[entropy_w_asc_idx[i]],
+                'entropy_weight_sort': entropy_w_asc.values[i],
+            })
+    print('Weight result has been saved to', filename)
 
 def main():
     global docs
@@ -172,6 +206,9 @@ def main():
 
     vocabulary_list = [item for sublist in vocab_l for item in sublist]
     log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
+    tdv_weights = compute_tdv(docs)
+
+    #export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, WEIGHT_CSV_SORT)
 
     # Just debugging
     #c = Counter(flat_list)

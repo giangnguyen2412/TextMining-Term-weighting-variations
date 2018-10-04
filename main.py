@@ -12,6 +12,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from nltk.corpus import words as nltk_words
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 from collections import Counter
 
@@ -97,6 +98,7 @@ def compute_tf_idf(docs):
     idf_value = np.log(docs_num/term_occurence_matrix)
     tf_value = term_occurence_num_matrix/vocab_size
 
+    # Return this value to get tf-idf weights
     tf_idf_weight = np.multiply(idf_value,tf_value)
 
     print(tf_idf_weight)
@@ -116,16 +118,70 @@ def compute_log_entropy(docs, vocabulary_list, occur_matrix):
 
     local_w = occur_matrix + 1;
     local_weight_t = np.log(local_w)
-    local_weight = np.mean(local_weight_t, axis=0)
+    local_weight = np.mean(local_weight_t, axis = 0)
     frequency_matrix_log = np.log(frequency_matrix + 1) # Add 1 to avoid inf numbers
     mul = np.multiply(frequency_matrix_log,frequency_matrix);
-    mul_sum = np.sum(mul, axis=0)
+    mul_sum = np.sum(mul, axis = 0)
     global_weight = 1 +  mul_sum/(np.log(docs_num+1))
     final_weight = np.multiply(local_weight,global_weight);
     log_entropy_weight = final_weight
     return log_entropy_weight
 
 def compute_tdv(docs):
+    # -------------------------------------------------------------
+    occurence_matrix = np.zeros((docs_num, vocab_size))
+    occurence_num_matrix = np.zeros((docs_num, vocab_size))
+    tdv_matrix = np.zeros((docs_num, vocab_size))
+    for text in docs:   # Iterate through all cocuments
+        # set() and list() seem to be erase value of input imme, so I need to perform preprocess 2 times => Need to improved
+        preprocessed_text = preprocess(text)    # preprocessed_text To get tokenized text in "unique" (set) format
+        preprocessed_text_set = set(preprocessed_text)
+
+        preprocessed_text_l = preprocess(text)  # preprocessed_text_l To get tokenized text in format with removing duplicate words
+        preprocessed_text_list = list(preprocessed_text_l)
+
+        row = docs.index(text)
+        col = [vocabulary.index(token) for token in preprocessed_text_set]
+
+        c = Counter(preprocessed_text_list)
+        for word in preprocessed_text_list:
+            term_freq = (c[word])
+            occurence_num_matrix[row, vocabulary.index(word)] += term_freq
+
+    #print(np.shape(occurence_num_matrix))
+    #input("Press Enter to continue...")
+
+    # ---------------------------------------------------------------
+    # The above part of code can be replaced simply by:
+    '''
+    words_tdv = np.zeros((docs_num, vocab_size))
+    tf_vectorizer = CountVectorizer(tokenizer=preprocess, stop_words=stopWords)
+
+    docs_terms = tf_vectorizer.fit_transform(docs)
+    occurence_num_matrix_test = docs_terms.todense()	# To get the matrix of token counts
+    print(np.shape(occurence_num_matrix_test))
+    compare_matrix = (occurence_num_matrix_test == occurence_num_matrix)    # For testing validity, expect to be True
+    print(compare_matrix)
+    input("Press Enter to continue...")
+    '''
+    centroid = np.mean(occurence_num_matrix, axis = 0)
+    for i in range(docs_num):
+        doc = occurence_num_matrix[i,:]
+        #print(np.shape(doc))
+        #input("Press Enter to continue...")
+        avg_sim = np.linalg.norm(centroid - doc)
+        for j in range(vocab_size):
+            #print(type(doc[j]))
+            #input("Press Enter to continue...")
+            if (doc[j] != 0):
+                doc_t = doc
+                doc_t[j] = 0;
+                avg_sim_m = np.linalg.norm(centroid - doc_t)
+                tdv_matrix[i, j] = avg_sim - avg_sim_m
+
+    tdv_weight = np.mean(tdv_matrix, axis = 0)
+
+    return tdv_weight
 
 def get_files_from_dir(directory):
     global docs
@@ -208,7 +264,7 @@ def main():
     log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
     tdv_weights = compute_tdv(docs)
 
-    #export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, WEIGHT_CSV_SORT)
+    export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, WEIGHT_CSV_SORT)
 
     # Just debugging
     #c = Counter(flat_list)

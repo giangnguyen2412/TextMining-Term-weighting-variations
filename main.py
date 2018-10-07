@@ -183,6 +183,9 @@ def compute_tdv(docs):
 
     return tdv_weight
 
+def comput_signal_noise(docs):
+    
+
 def get_files_from_dir(directory):
     global docs
     global docs_num
@@ -263,6 +266,7 @@ def main():
     vocabulary_list = [item for sublist in vocab_l for item in sublist]
     log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
     tdv_weights = compute_tdv(docs)
+    signal_noise_weights = comput_signal_noise(docs)
 
     export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, WEIGHT_CSV_SORT)
 

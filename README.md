@@ -1,4 +1,4 @@
-# Term-weighting---IDF-TDV-and-log-entropy
+# Term-weighting-IDF-TDV-Signal/Noise-log-entropy
 
 
 Term Frequency (TF): is a scoring of the frequency of the word in the current document. Since every document is different in length, it is possible that a term would appear much more times in long documents than shorter ones. The term frequency is often divided by the document length to normalize.

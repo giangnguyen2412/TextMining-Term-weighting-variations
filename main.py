@@ -129,7 +129,7 @@ def compute_log_entropy(docs, vocabulary_list, occur_matrix):
 
 def compute_tdv(docs):
     # -------------------------------------------------------------
-    occurence_matrix = np.zeros((docs_num, vocab_size))
+    #occurence_matrix = np.zeros((docs_num, vocab_size))
     occurence_num_matrix = np.zeros((docs_num, vocab_size))
     tdv_matrix = np.zeros((docs_num, vocab_size))
     for text in docs:   # Iterate through all cocuments
@@ -182,9 +182,30 @@ def compute_tdv(docs):
     tdv_weight = np.mean(tdv_matrix, axis = 0)
 
     return tdv_weight
+	
+def compute_signal_noise(docs):
+	## -------------------- FOR THIS ADDITIONAL PART, WE WILL USE CountVectorizer to get occurence_num_matrix ##
+    occurence_matrix = np.zeros((docs_num, vocab_size))
+    occurence_num_matrix = np.zeros((1, vocab_size))
+    words_sn = np.zeros((docs_num, vocab_size))
+    tf_vectorizer = CountVectorizer(tokenizer=preprocess, stop_words=stopWords)
 
-def comput_signal_noise(docs):
-    
+    docs_terms = tf_vectorizer.fit_transform(docs)
+    occurence_matrix = docs_terms.todense()	# To get the matrix of token counts
+    occurence_matrix += 1	# Add 1 to avoid log error
+
+    occurence_num_matrix = np.sum(occurence_matrix, axis = 0)
+    clone_occurence_num_matrix = np.tile(occurence_num_matrix, (docs_num,1));
+	
+    p_im = np.divide(occurence_matrix, clone_occurence_num_matrix) # occurence_matrix/clone_occurence_num_matrix
+    log_p_im = np.log(1/p_im)
+	
+    multiply = np.multiply(p_im, log_p_im)
+    Nm = np.sum(multiply, axis = 0)
+    fm = np.log(occurence_num_matrix) - Nm
+    print(np.shape(fm))
+    return np.squeeze(np.asarray(fm))
+
 
 def get_files_from_dir(directory):
     global docs
@@ -206,7 +227,7 @@ WEIGHT_CSV = 'self_weight.csv'
 WEIGHT_CSV_SORT = 'self_weight_sort.csv'
 EXPECTED_TERM_NUM = 50
 
-def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, filename):
+def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, signal_noise_weights, filename):
     entropy_arr = np.squeeze(np.asarray(entropy_weights))
     idf_term_list = pd.Series(idf_weights)
     idf_w_des = idf_term_list.sort_values(ascending=False)
@@ -219,8 +240,13 @@ def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, filename):
     entropy_term_list = pd.Series(entropy_arr)
     entropy_w_asc = entropy_term_list.sort_values(ascending=True)
     entropy_w_asc_idx = entropy_w_asc.index
+	
+    sn_term_list = pd.Series(signal_noise_weights)
+    sn_w_des = sn_term_list.sort_values(ascending=False)
+    sn_w_des_idx = sn_w_des.index
+	
     with open(filename, 'w', newline='') as csvfile:
-        fieldnames = ['idf_term_sort', 'idf_weight_sort','tdv_term_sort', 'tdv_weight_sort','entropy_term_sort', 'entropy_weight_sort']
+        fieldnames = ['idf_term_sort', 'idf_weight_sort','tdv_term_sort', 'tdv_weight_sort','entropy_term_sort', 'entropy_weight_sort', 'S/N_term_sort', 'S/N_weight_sort']
         writer = DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for i in range(vocab_size):
@@ -231,6 +257,8 @@ def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, filename):
                 'tdv_weight_sort': tdv_w_des.values[i],
                 'entropy_term_sort':vocabulary[entropy_w_asc_idx[i]],
                 'entropy_weight_sort': entropy_w_asc.values[i],
+                'S/N_term_sort':vocabulary[sn_w_des_idx[i]],
+                'S/N_weight_sort': sn_w_des.values[i],				
             })
     print('Weight result has been saved to', filename)
 
@@ -266,9 +294,9 @@ def main():
     vocabulary_list = [item for sublist in vocab_l for item in sublist]
     log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
     tdv_weights = compute_tdv(docs)
-    signal_noise_weights = comput_signal_noise(docs)
+    signal_noise_weights = compute_signal_noise(docs)
 
-    export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, WEIGHT_CSV_SORT)
+    export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, signal_noise_weights, WEIGHT_CSV_SORT)
 
     # Just debugging
     #c = Counter(flat_list)

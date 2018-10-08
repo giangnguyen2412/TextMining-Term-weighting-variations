@@ -31,7 +31,7 @@ docs = []
 docs_name = []
 vocabulary = []
 vocab_size = 0
-directory = ('20news-bydate/*/*')
+directory = ('20news-bydate/*/*') # We should you tuple for string
 
 def preprocess(text):
     # I actually think doing both stemming and lemmatizing is a redundance

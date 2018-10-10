@@ -13,6 +13,8 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from nltk.corpus import words as nltk_words
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+import itertools
+import timeit
 
 from collections import Counter
 
@@ -31,7 +33,7 @@ docs = []
 docs_name = []
 vocabulary = []
 vocab_size = 0
-directory = ('20news-bydate/*/*') # We should you tuple for string
+directory = ('20news-bydate/*/*')
 
 def preprocess(text):
     # I actually think doing both stemming and lemmatizing is a redundance
@@ -183,6 +185,73 @@ def compute_tdv(docs):
 
     return tdv_weight
 	
+
+def find_tuples(lst, num):
+    return [i for i in itertools.permutations(lst, num)]
+	
+def calculate_avg_sim(occurence_matrix, vocab_tuple):
+	''' 
+	Bcz we want to get pairs so num is 2
+	The pairs are repeated, for example (i,j) and (j,i),
+	thn we need to divide by 2 for calculating Similarity
+	'''
+	pair_tuple = find_tuples(vocab_tuple, 2)	
+	avg_sim = 0
+	for i in range(len(pair_tuple)):
+		# Get each document pair first
+		first_doc_num = (pair_tuple[i])[0]
+		secon_doc_num = (pair_tuple[i])[1]
+		
+		first_doc = occurence_matrix[first_doc_num, :]
+		secon_doc = occurence_matrix[secon_doc_num, :]
+		avg_sim += np.linalg.norm(first_doc - secon_doc)
+		
+	avg_sim = (avg_sim/(docs_num*(docs_num-1)))/2
+	return avg_sim
+	
+	
+def compute_tdv_v2(docs):
+	occurence_matrix = np.zeros((docs_num, vocab_size))
+	occurence_matrix_t = np.zeros((docs_num, vocab_size))
+	avg_sim_matrix_m = np.zeros((1, vocab_size))
+	words_sn = np.zeros((docs_num, vocab_size))
+	tf_vectorizer = CountVectorizer(tokenizer=preprocess, stop_words=stopWords)
+	
+	docs_terms = tf_vectorizer.fit_transform(docs)
+	occurence_matrix = docs_terms.todense()	# To get the matrix of token counts
+	
+	vocab_tuple = ()
+	for i in range(docs_num):
+		vocab_tuple += (i,)
+		
+	avg_sim = calculate_avg_sim(occurence_matrix, vocab_tuple)
+	
+	zeros_col = np.zeros(docs_num)
+	avg_sim_m = 0
+	for i in range(vocab_size):
+		occurence_matrix_t = np.array(occurence_matrix)
+		occurence_matrix_t[:, i] = zeros_col 	# Remove occurence of term i-th from collection
+		avg_sim_m = calculate_avg_sim(occurence_matrix_t, vocab_tuple)
+		avg_sim_matrix_m[1,i] = avg_sim_m
+		
+	avg_sim_matrix_m = avg_sim_matrix_m - avg_sim
+	return avg_sim_matrix_m;
+		
+	'''
+	#print(np.count_nonzero(occurence_matrix_t[:,i]))
+	#print(np.count_nonzero(occurence_matrix_t[:,i+1]))
+	#input("Press Enter to continue...")
+	print(occurence_matrix)
+	print(np.count_nonzero(occurence_matrix))
+	input("Press Enter to continue...")
+	print(np.count_nonzero(occurence_matrix_t))
+	print(avg_sim)
+	print((pair_tuple))
+	print(np.shape(pair_tuple))
+	input("Press Enter to continue...")
+	'''
+
+	
 def compute_signal_noise(docs):
 	## -------------------- FOR THIS ADDITIONAL PART, WE WILL USE CountVectorizer to get occurence_num_matrix ##
     occurence_matrix = np.zeros((docs_num, vocab_size))
@@ -263,12 +332,14 @@ def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, signal_noise_
     print('Weight result has been saved to', filename)
 
 def main():
+    start = timeit.default_timer()
     global docs
     global docs_name
     global vocabulary
     global vocab_size
 
     docs,docs_name = get_files_from_dir(directory)
+	
     '''
     print(docs)
     print(docs_name)
@@ -294,10 +365,12 @@ def main():
     vocabulary_list = [item for sublist in vocab_l for item in sublist]
     log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
     tdv_weights = compute_tdv(docs)
+    tdv_weights_v2 = compute_tdv_v2(docs)
     signal_noise_weights = compute_signal_noise(docs)
 
     export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, signal_noise_weights, WEIGHT_CSV_SORT)
-
+    stop = timeit.default_timer()
+    print('Eslaped Time: ', stop - start)  
     # Just debugging
     #c = Counter(flat_list)
     #print(len(c))

@@ -33,7 +33,10 @@ docs = []
 docs_name = []
 vocabulary = []
 vocab_size = 0
-directory = ('20news-bydate/*/*')
+dir = ('20news-bydate/*/*')
+WEIGHT_CSV = 'self_weight.csv'
+WEIGHT_CSV_SORT = 'self_weight_sort.csv'
+EXPECTED_TERM_NUM = 50
 
 def preprocess(text):
     # I actually think doing both stemming and lemmatizing is a redundance
@@ -67,90 +70,80 @@ def preprocess(text):
             '''
 
 def compute_tf_idf(docs):
-    term_occurence_matrix_ret = np.zeros((docs_num, vocab_size))
-    occurence_matrix = np.zeros((docs_num, vocab_size))
-    occurence_num_matrix = np.zeros((docs_num, vocab_size))
-    for text in docs:   # Iterate through all cocuments
-        # set() and list() seem to be erase value of input imme, so I need to perform preprocess 2 times => Need to improved
-        preprocessed_text = preprocess(text)
-        preprocessed_text_set = set(preprocessed_text)
-
-        preprocessed_text_l = preprocess(text)
-        preprocessed_text_list = list(preprocessed_text_l)
+    occurence_mat_ret = np.zeros((docs_num, vocab_size))
+    df_mat = np.zeros((docs_num, vocab_size))
+    occurence_cnt_mat = np.zeros((docs_num, vocab_size))
+    for text in docs:   # Iterate through all documents
+        prep_text_l = list(preprocess(text))
+		
+        prep_text_l_clone = prep_text_l.copy()
+        prep_text_s = set(prep_text_l_clone)
 
         row = docs.index(text)
-        col = [vocabulary.index(token) for token in preprocessed_text_set]
-        occurence_matrix[row, col] += 1
+        col = [vocabulary.index(token) for token in prep_text_s]
+        df_mat[row, col] += 1
 
-        c = Counter(preprocessed_text_list)
-        for word in preprocessed_text_list:
+        c = Counter(prep_text_l)
+        for word in prep_text_l:
             term_freq = (c[word])
-            occurence_num_matrix[row, vocabulary.index(word)] += term_freq
+            occurence_cnt_mat[row, vocabulary.index(word)] += term_freq
 
-    term_occurence_matrix_ret = occurence_num_matrix
-    term_occurence_matrix = np.sum(occurence_matrix, axis = 0)
-    term_occurence_num_matrix = np.sum(occurence_num_matrix, axis = 0)
+    occurence_mat_ret = occurence_cnt_mat
+    df_mat = np.sum(df_mat, axis = 0)
+    tf_mat = np.sum(occurence_cnt_mat, axis = 0)
 
-    print(term_occurence_matrix)
-    print(term_occurence_num_matrix)
-
-    print(len(term_occurence_matrix))
-    print(len(term_occurence_num_matrix))
-
-    idf_value = np.log(docs_num/term_occurence_matrix)
-    tf_value = term_occurence_num_matrix/vocab_size
+    idf_val = np.log(docs_num/df_mat)
+    tf_val = tf_mat/vocab_size
 
     # Return this value to get tf-idf weights
-    tf_idf_weight = np.multiply(idf_value,tf_value)
+    tf_idf_w = np.multiply(idf_val,tf_val)
 
-    print(tf_idf_weight)
-    return idf_value, term_occurence_matrix_ret
+    return idf_val, occurence_mat_ret
 
 def compute_log_entropy(docs, vocabulary_list, occur_matrix):
-    frequency_matrix = np.zeros((docs_num, vocab_size))
+    # An array to store occurence frequency
+    frequency_mat = np.zeros((docs_num, vocab_size))
     cVocabulary = Counter(vocabulary_list)
     for text in docs:   # Iterate through all cocuments
         cText = Counter(text)
-        preprocessed_text = list(preprocess(text))
+        prep_text_l = list(preprocess(text))
         row = docs.index(text)
 
-        for word in preprocessed_text:
+        for word in prep_text_l:
             col = vocabulary.index(word)
-            frequency_matrix[row, col] += cText[word]/cVocabulary[word]
+            frequency_mat[row, col] += cText[word]/cVocabulary[word]
 
     local_w = occur_matrix + 1;
-    local_weight_t = np.log(local_w)
-    local_weight = np.mean(local_weight_t, axis = 0)
-    frequency_matrix_log = np.log(frequency_matrix + 1) # Add 1 to avoid inf numbers
-    mul = np.multiply(frequency_matrix_log,frequency_matrix);
+    local_w = np.log(local_w)
+    local_w = np.mean(local_w, axis = 0)
+	
+    frequency_matrix_log = np.log(frequency_mat + 1) # Add 1 to avoid inf numbers
+    mul = np.multiply(frequency_matrix_log,frequency_mat);
     mul_sum = np.sum(mul, axis = 0)
-    global_weight = 1 +  mul_sum/(np.log(docs_num+1))
-    final_weight = np.multiply(local_weight,global_weight);
-    log_entropy_weight = final_weight
-    return log_entropy_weight
+    global_w = 1 +  mul_sum/(np.log(docs_num+1))
+    final_w = np.multiply(local_w,global_w);
+	
+    log_entropy_w = final_w
+    return log_entropy_w
 
 def compute_tdv(docs):
-    # -------------------------------------------------------------
-    #occurence_matrix = np.zeros((docs_num, vocab_size))
-    occurence_num_matrix = np.zeros((docs_num, vocab_size))
-    tdv_matrix = np.zeros((docs_num, vocab_size))
-    for text in docs:   # Iterate through all cocuments
-        # set() and list() seem to be erase value of input imme, so I need to perform preprocess 2 times => Need to improved
-        preprocessed_text = preprocess(text)    # preprocessed_text To get tokenized text in "unique" (set) format
-        preprocessed_text_set = set(preprocessed_text)
-
-        preprocessed_text_l = preprocess(text)  # preprocessed_text_l To get tokenized text in format with removing duplicate words
-        preprocessed_text_list = list(preprocessed_text_l)
+    occurence_freq_mat = np.zeros((docs_num, vocab_size))
+    tdv_mat = np.zeros((docs_num, vocab_size))
+    for text in docs:   # Iterate through all documents
+        prep_text_l = list(preprocess(text))
+		
+        prep_text_l_clone = prep_text_l.copy()
+        prep_text_s = set(prep_text_l_clone)
 
         row = docs.index(text)
-        col = [vocabulary.index(token) for token in preprocessed_text_set]
+        col = [vocabulary.index(token) for token in prep_text_s]
 
-        c = Counter(preprocessed_text_list)
-        for word in preprocessed_text_list:
+        c = Counter(prep_text_l)
+        for word in prep_text_l:
             term_freq = (c[word])
-            occurence_num_matrix[row, vocabulary.index(word)] += term_freq
+            occurence_freq_mat[row, vocabulary.index(word)] += term_freq
 
-    #print(np.shape(occurence_num_matrix))
+    #print(np.shape(occurence_freq_mat))
     #input("Press Enter to continue...")
 
     # ---------------------------------------------------------------
@@ -162,48 +155,44 @@ def compute_tdv(docs):
     docs_terms = tf_vectorizer.fit_transform(docs)
     occurence_num_matrix_test = docs_terms.todense()	# To get the matrix of token counts
     print(np.shape(occurence_num_matrix_test))
-    compare_matrix = (occurence_num_matrix_test == occurence_num_matrix)    # For testing validity, expect to be True
+    compare_matrix = (occurence_num_matrix_test == occurence_freq_mat)    # For testing validity, expect to be True
     print(compare_matrix)
     input("Press Enter to continue...")
     '''
-    centroid = np.mean(occurence_num_matrix, axis = 0)
+    centroid = np.mean(occurence_freq_mat, axis = 0)
     for i in range(docs_num):
-        doc = occurence_num_matrix[i,:]
-        #print(np.shape(doc))
-        #input("Press Enter to continue...")
+        doc = occurence_freq_mat[i,:]
         avg_sim = np.linalg.norm(centroid - doc)
         for j in range(vocab_size):
-            #print(type(doc[j]))
-            #input("Press Enter to continue...")
             if (doc[j] != 0):
                 doc_t = doc
                 doc_t[j] = 0;
                 avg_sim_m = np.linalg.norm(centroid - doc_t)
-                tdv_matrix[i, j] = avg_sim - avg_sim_m
+                tdv_mat[i, j] = avg_sim - avg_sim_m
 
-    tdv_weight = np.mean(tdv_matrix, axis = 0)
+    tdv_w = np.mean(tdv_mat, axis = 0)
 
-    return tdv_weight
+    return tdv_w
 	
 
-def find_tuples(lst, num):
-    return [i for i in itertools.permutations(lst, num)]
+def find_tuples(tup, num):
+    return [i for i in itertools.permutations(tup, num)]
 	
-def calculate_avg_sim(occurence_matrix, vocab_tuple):
+def calculate_avg_sim(occurence_mat, vocab_tup):
 	''' 
 	Bcz we want to get pairs so num is 2
 	The pairs are repeated, for example (i,j) and (j,i),
 	thn we need to divide by 2 for calculating Similarity
 	'''
-	pair_tuple = find_tuples(vocab_tuple, 2)	
+	pair_tup = find_tuples(vocab_tup, 2)	
 	avg_sim = 0
 	for i in range(len(pair_tuple)):
 		# Get each document pair first
-		first_doc_num = (pair_tuple[i])[0]
-		secon_doc_num = (pair_tuple[i])[1]
+		first_doc_num = (pair_tup[i])[0]
+		secon_doc_num = (pair_tup[i])[1]
 		
-		first_doc = occurence_matrix[first_doc_num, :]
-		secon_doc = occurence_matrix[secon_doc_num, :]
+		first_doc = occurence_mat[first_doc_num, :]
+		secon_doc = occurence_mat[secon_doc_num, :]
 		avg_sim += np.linalg.norm(first_doc - secon_doc)
 		
 	avg_sim = (avg_sim/(docs_num*(docs_num-1)))/2
@@ -211,75 +200,74 @@ def calculate_avg_sim(occurence_matrix, vocab_tuple):
 	
 	
 def compute_tdv_v2(docs):
-	occurence_matrix = np.zeros((docs_num, vocab_size))
-	occurence_matrix_t = np.zeros((docs_num, vocab_size))
-	avg_sim_matrix_m = np.zeros((1, vocab_size))
+	occurence_mat = np.zeros((docs_num, vocab_size))
+	# Temporary value of occurence_mat
+	occurence_mat_t = np.zeros((docs_num, vocab_size))
+	
+	avg_sim_mat = np.zeros((1, vocab_size))
 	words_sn = np.zeros((docs_num, vocab_size))
 	tf_vectorizer = CountVectorizer(tokenizer=preprocess, stop_words=stopWords)
 	
 	docs_terms = tf_vectorizer.fit_transform(docs)
-	occurence_matrix = docs_terms.todense()	# To get the matrix of token counts
+	occurence_mat = docs_terms.todense()	# To get the matrix of token counts
 	
-	vocab_tuple = ()
+	vocab_tup = ()
 	for i in range(docs_num):
-		vocab_tuple += (i,)
+		vocab_tup += (i,)
 		
-	avg_sim = calculate_avg_sim(occurence_matrix, vocab_tuple)
+	avg_sim = calculate_avg_sim(occurence_mat, vocab_tup)
 	
 	zeros_col = np.zeros(docs_num)
 	avg_sim_m = 0
 	for i in range(vocab_size):
-		occurence_matrix_t = np.array(occurence_matrix)
-		occurence_matrix_t[:, i] = zeros_col 	# Remove occurence of term i-th from collection
-		avg_sim_m = calculate_avg_sim(occurence_matrix_t, vocab_tuple)
-		avg_sim_matrix_m[1,i] = avg_sim_m
+		occurence_mat_t = np.array(occurence_mat)
+		occurence_mat_t[:, i] = zeros_col 	# Remove occurence of term i-th from collection
+		avg_sim_m = calculate_avg_sim(occurence_mat_t, vocab_tup)
+		avg_sim_mat[0,i] = avg_sim_m
 		
-	avg_sim_matrix_m = avg_sim_matrix_m - avg_sim
-	return avg_sim_matrix_m;
+	avg_sim_mat = avg_sim_mat - avg_sim
+	return avg_sim_mat;
 		
 	'''
-	#print(np.count_nonzero(occurence_matrix_t[:,i]))
-	#print(np.count_nonzero(occurence_matrix_t[:,i+1]))
+	#print(np.count_nonzero(occurence_mat_t[:,i]))
+	#print(np.count_nonzero(occurence_mat_t[:,i+1]))
 	#input("Press Enter to continue...")
-	print(occurence_matrix)
-	print(np.count_nonzero(occurence_matrix))
+	print(occurence_mat)
+	print(np.count_nonzero(occurence_mat))
 	input("Press Enter to continue...")
-	print(np.count_nonzero(occurence_matrix_t))
+	print(np.count_nonzero(occurence_mat_t))
 	print(avg_sim)
-	print((pair_tuple))
-	print(np.shape(pair_tuple))
 	input("Press Enter to continue...")
 	'''
 
 	
 def compute_signal_noise(docs):
-	## -------------------- FOR THIS ADDITIONAL PART, WE WILL USE CountVectorizer to get occurence_num_matrix ##
-    occurence_matrix = np.zeros((docs_num, vocab_size))
-    occurence_num_matrix = np.zeros((1, vocab_size))
-    words_sn = np.zeros((docs_num, vocab_size))
+	## FOR THIS ADDITIONAL PART, WE WILL USE CountVectorizer to get occurence_freq_mat ##
+    occurence_mat = np.zeros((docs_num, vocab_size))
+    occurence_freq_mat = np.zeros((1, vocab_size))
     tf_vectorizer = CountVectorizer(tokenizer=preprocess, stop_words=stopWords)
 
     docs_terms = tf_vectorizer.fit_transform(docs)
-    occurence_matrix = docs_terms.todense()	# To get the matrix of token counts
-    occurence_matrix += 1	# Add 1 to avoid log error
+    occurence_mat = docs_terms.todense()	# To get the matrix of token counts
+    occurence_mat += 1	# Add 1 to avoid log error
 
-    occurence_num_matrix = np.sum(occurence_matrix, axis = 0)
-    clone_occurence_num_matrix = np.tile(occurence_num_matrix, (docs_num,1));
+    occurence_freq_mat = np.sum(occurence_mat, axis = 0)
+    occurence_freq_mat_clone = np.tile(occurence_freq_mat, (docs_num,1));
 	
-    p_im = np.divide(occurence_matrix, clone_occurence_num_matrix) # occurence_matrix/clone_occurence_num_matrix
+    p_im = np.divide(occurence_mat, occurence_freq_mat_clone) # occurence_mat/clone_occurence_num_matrix
     log_p_im = np.log(1/p_im)
 	
     multiply = np.multiply(p_im, log_p_im)
     Nm = np.sum(multiply, axis = 0)
-    fm = np.log(occurence_num_matrix) - Nm
-    print(np.shape(fm))
+    fm = np.log(occurence_freq_mat) - Nm
+	
     return np.squeeze(np.asarray(fm))
 
 
-def get_files_from_dir(directory):
+def get_files(dir):
     global docs
     global docs_num
-    files = glob.glob(directory, recursive=True)
+    files = glob.glob(dir, recursive=True)
     for file in files:
         with open(file, mode='r') as f:
              docs.append(f.read())
@@ -292,11 +280,7 @@ def get_files_from_dir(directory):
     print(len(files))
     '''
 
-WEIGHT_CSV = 'self_weight.csv'
-WEIGHT_CSV_SORT = 'self_weight_sort.csv'
-EXPECTED_TERM_NUM = 50
-
-def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, signal_noise_weights, filename):
+def sort_and_export(idf_weights, tdv_weights, entropy_weights, sn_weights, filename):
     entropy_arr = np.squeeze(np.asarray(entropy_weights))
     idf_term_list = pd.Series(idf_weights)
     idf_w_des = idf_term_list.sort_values(ascending=False)
@@ -310,7 +294,7 @@ def export_to_file_sort(idf_weights, tdv_weights, entropy_weights, signal_noise_
     entropy_w_asc = entropy_term_list.sort_values(ascending=True)
     entropy_w_asc_idx = entropy_w_asc.index
 	
-    sn_term_list = pd.Series(signal_noise_weights)
+    sn_term_list = pd.Series(sn_weights)
     sn_w_des = sn_term_list.sort_values(ascending=False)
     sn_w_des_idx = sn_w_des.index
 	
@@ -338,7 +322,7 @@ def main():
     global vocabulary
     global vocab_size
 
-    docs,docs_name = get_files_from_dir(directory)
+    docs,docs_name = get_files(dir)
 	
     '''
     print(docs)
@@ -360,15 +344,18 @@ def main():
     vocab_size = len(vocabulary)
 
     occur_matrix = np.zeros((docs_num, vocab_size))
-    if_idf_weight, occur_matrix = compute_tf_idf(docs)
+    if_idf_w, occur_matrix = compute_tf_idf(docs)
 
-    vocabulary_list = [item for sublist in vocab_l for item in sublist]
-    log_entropy_weight = compute_log_entropy(docs, vocabulary_list, occur_matrix)
-    tdv_weights = compute_tdv(docs)
-    tdv_weights_v2 = compute_tdv_v2(docs)
-    signal_noise_weights = compute_signal_noise(docs)
+    vocabulary_l = [item for sublist in vocab_l for item in sublist]
+	
+    log_entropy_w = compute_log_entropy(docs, vocabulary_l, occur_matrix)
+	
+	# Can get occur_matrix and vocabulary_l from above to speed up
+    tdv_w = compute_tdv(docs)
+    #tdv_weights_v2 = compute_tdv_v2(docs)
+    signal_noise_w = compute_signal_noise(docs)
 
-    export_to_file_sort(if_idf_weight, tdv_weights, log_entropy_weight, signal_noise_weights, WEIGHT_CSV_SORT)
+    sort_and_export(if_idf_w, tdv_w, log_entropy_w, signal_noise_w, WEIGHT_CSV_SORT)
     stop = timeit.default_timer()
     print('Eslaped Time: ', stop - start)  
     # Just debugging

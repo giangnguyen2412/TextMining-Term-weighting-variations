@@ -6,3 +6,4 @@ Term Frequency (TF): is a scoring of the frequency of the word in the current do
 I implemented the TF-IDF based on formula of this site: https://medium.com/greyatom/an-introduction-to-bag-of-words-in-nlp-ac967d43b428
 
 Signal/Noise Term weighting variation: https://ibb.co/nQd0dp
+TDV Term weighting: https://ibb.co/foJ9R9

@@ -350,7 +350,7 @@ def main():
 	
     log_entropy_w = compute_log_entropy(docs, vocabulary_l, occur_matrix)
 	
-	# Can get occur_matrix and vocabulary_l from above to speed up
+    # Can get occur_matrix and vocabulary_l from above to speed up
     tdv_w = compute_tdv(docs)
     #tdv_weights_v2 = compute_tdv_v2(docs)
     signal_noise_w = compute_signal_noise(docs)
